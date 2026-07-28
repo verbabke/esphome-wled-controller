@@ -9,11 +9,7 @@ esphome:
   on_boot:
     priority: -100  # run after all components are ready
     then:
-      - output.turn_on: lcd_backlight
-      - globals.set:
-          id: lcd_on
-          value: 'true'
-      - component.update: main_lcd
+      - script.execute: lcd_wake  # turn on backlight and start 10s timeout
 
 esp32:
   board: esp32dev
@@ -157,6 +153,11 @@ display:
     rs_pin: GPIO23
     update_interval: 1s
     lambda: |-
+      if (!id(lcd_on)) {
+        it.print(0, 0, "                ");
+        it.print(0, 1, "                ");
+        return;
+      }
       if (!global_api_server->is_connected()) {
         it.print(0, 0, "No HA connection ");
         it.print(0, 1, "Connecting...   ");
@@ -164,11 +165,6 @@ display:
       }
       if (id(preset_menu).is_active()) {
         id(preset_menu).draw();
-        return;
-      }
-      if (!id(lcd_on)) {
-        it.print(0, 0, "                ");
-        it.print(0, 1, "                ");
         return;
       }
       it.printf(0, 0, "%-16.16s",
