@@ -2,6 +2,7 @@ substitutions:
   # Update these to match your Home Assistant entity IDs
   light_entity: light.your_wled_light
   preset_entity: select.your_wled_preset_selector
+  wled_host: your_wled_ip_or_hostname
 
 esphome:
   name: esp32-led-controller
@@ -9,7 +10,7 @@ esphome:
   on_boot:
     priority: -100  # run after all components are ready
     then:
-      - script.execute: lcd_wake  # turn on backlight and start 10s timeout
+      - script.execute: lcd_wake
 
 esp32:
   board: esp32dev
@@ -24,7 +25,7 @@ api:
   encryption:
     key: !secret api_encryption_key
   on_client_connected:
-    - script.execute: lcd_wake  # start normal 10s timeout once HA connects
+    - script.execute: lcd_wake
   on_client_disconnected:
     - script.stop: lcd_wake
     - output.turn_on: lcd_backlight
@@ -47,6 +48,9 @@ wifi:
     password: !secret ap_password
 
 captive_portal:
+
+http_request:
+  timeout: 2s
 
 # Backlight transistor control – GPIO17 drives the base via 1kΩ resistor
 output:
@@ -171,8 +175,16 @@ display:
         id(ha_wled_preset).has_state()
           ? id(ha_wled_preset).state.c_str() : "No preset");
       if (id(ha_light_state).state) {
-        int bri = id(ha_wled_brightness_raw).has_state()
-                  ? (int)roundf(id(ha_wled_brightness_raw).state / 255.0 * 100) : 0;
+        int bri = 0;
+        if (id(ha_wled_brightness_raw).has_state()) {
+          float raw = id(ha_wled_brightness_raw).state;
+          bri = (int)roundf(raw / 255.0f * 100.0f);
+        } else if (id(brightness_encoder).has_state()) {
+          // Fallback so the LCD still reflects local knob changes if HA attribute is unavailable.
+          bri = (int)roundf(id(brightness_encoder).state);
+        }
+        if (bri < 0) bri = 0;
+        if (bri > 100) bri = 100;
         it.printf(0, 1, "ON   Bright:%3d%%", bri);
       } else {
         it.print(0, 1, "OFF             ");
@@ -292,11 +304,24 @@ sensor:
       - debounce: 50ms
     on_value:
       - script.execute: lcd_wake
-      - homeassistant.action:
-          action: light.turn_on
-          data:
-            entity_id: ${light_entity}
-            brightness: !lambda "return (int)(x / 100.0 * 255);"
+      - http_request.post:
+          url: http://${wled_host}/json/state
+          json: |-
+            int bri = (int)roundf(x * 255.0f / 100.0f);
+            if (bri == 0) {
+              root["on"] = false;
+            } else {
+              root["on"] = true;
+              root["bri"] = bri;
+            }
+          on_response:
+            then:
+              - logger.log:
+                  format: "WLED brightness update returned HTTP %d"
+                  args: ["response->status_code"]
+          on_error:
+            then:
+              - logger.log: "WLED brightness update failed"
 
   # Joystick Y axis (GPIO36) – scrolls menu up/down with wrap-around
   # 350ms lock after each move prevents spring-back from triggering a reverse scroll
