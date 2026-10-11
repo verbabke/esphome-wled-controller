@@ -1,15 +1,14 @@
 # ESPHome WLED Controller
 
-An ESPHome-based controller for WLED-powered LED strips, integrated with Home Assistant. Features a 16x2 LCD display, rotary encoder for brightness, and a joystick-driven preset menu.
+I was getting tired of having to open up my phone every time I want to control my WLED led strip, so I made a physical controller that integrates with WLED and Home Assistant. It is built on an ESP32 using ESPHome.
 
 ## Features
 
-- **Brightness control** — rotary encoder adjusts WLED brightness (0-100%)
-- **Power toggle** — rotary encoder push-button toggles WLED on/off
-- **Preset menu** — joystick opens an on-screen menu to select WLED presets
-- **LCD auto-blank** — display turns off after 10 seconds of inactivity
-- **HA connection status** — LCD shows "No HA connection" when offline
-- **3D-printable enclosure** — compact case for easy assembly
+- Brightness control
+- Power toggle
+- Preset menu
+- Display turns off on inactivity
+- 3D-printable enclosure
 
 ![Image](https://github.com/bjornverbakel/esphome-wled-controller/blob/main/img/img1.jpg)
 
